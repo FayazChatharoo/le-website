@@ -12,11 +12,10 @@ import aboutSection from "./animations/sections/about.js";
     heroAnimation?.();
     bridgeSection?.();
     aboutSection?.();
-    console.log("ZLE Website loaded");
   });
 })();
 
 
 
-
+console.info("[LE] bundle chargé");
 
