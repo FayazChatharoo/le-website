@@ -66,7 +66,7 @@
     // Sources (order: webm then mp4 fallback)
     const s1 = document.createElement('source');
     //s1.src = '/assets/videos/intro.webm';
-    s1.src = 'http://127.0.0.1:5500/assets/videos/assets/videos/intro.webm';
+    s1.src = 'https://spectacular-heliotrope-95f142.netlify.app/assets/videos/assets/videos/intro.webm';
     s1.type = 'video/webm';
     const s2 = document.createElement('source');
     //s2.src = '/assets/videos/intro.mp4';
