@@ -1,3 +1,4 @@
+import "./animations/preloaderVideo.js";
 import introAnimation from "./animations/intro.js";
 import navbarAnimation from "./animations/navbar.js";
 import heroAnimation from "./animations/hero.js";
@@ -17,5 +18,5 @@ import aboutSection from "./animations/sections/about.js";
 
 
 
-console.info("[LE] bundle chargé");
+console.info("[LE] bundle chargé live server finder localhost thing");
 
