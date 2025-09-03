@@ -7,6 +7,7 @@ import initResultsMarquee from "./animations/marquee.js";
 import bridgeSection from "./animations/sections/bridge.js";
 import aboutSection from "./animations/sections/about.js";
 import initGlowCards from "./animations/glow-card.js";
+import initHeroScroll from "./scroll/heroScroll.js";
 
 (function initLE(){
   // Compute and expose skip flag ASAP
@@ -23,6 +24,7 @@ import initGlowCards from "./animations/glow-card.js";
     bridgeSection?.();
     aboutSection?.();
     initGlowCards({ selector: '.card' });
+    initHeroScroll?.();
   });
 })();
 
