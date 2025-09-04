@@ -49,10 +49,14 @@ export default function heroAnimation() {
     });
   }
 
+  // Note: First heading will be controlled by heroScroll.js
+
   // Configuration de l'animation
   const opacityDur = 0.1;
   const colorDur = 0.8;
   
+  // First heading will be controlled by heroScroll.js
+
   // Animation principale avec stagger.onComplete
   tl.to(chars, {
     opacity: 1,
@@ -77,15 +81,8 @@ export default function heroAnimation() {
   // Pause courte après l'animation du texte
   tl.to({}, { duration: 0.3 });
 
-  // Animation du CTA : fade in + slide up
-  if (cta) {
-    tl.to(cta, {
-      opacity: 1,
-      y: 0,
-      duration: 1.6,
-      ease: (window.LE && typeof window.LE.ensureCustomEase === 'function' && window.LE.ensureCustomEase())
-    });
-  }
+  // CTA animation will be triggered by last line completion event
+  // (moved to event listener below)
 
   // Accessibility: if reduced motion, jump to final state immediately
   try {
@@ -106,10 +103,24 @@ export default function heroAnimation() {
     }, 1000); // 0.6s (bands) + 0.6s (video) = 1.2s
   });
 
+  // Listen for last line completion to trigger CTA animation
+  window.addEventListener('le:hero:last-line-complete', () => {
+    if (cta) {
+      gsap.to(cta, {
+        opacity: 1,
+        y: 0,
+        duration: 1.6,
+        ease: (window.LE && typeof window.LE.ensureCustomEase === 'function' && window.LE.ensureCustomEase())
+      });
+    }
+  });
+
   // If intro/preloader are skipped (revisit), start the hero timeline automatically
   if (window.LE && window.LE.shouldSkipIntro) {
     // Start soon after paint so layout is ready
     requestAnimationFrame(() => tl.play());
+    // First heading will be controlled by heroScroll.js
+    // CTA will be triggered by le:hero:last-line-complete event
   } else {
     // Safety fallback: if the event never arrives, start after a short delay
     setTimeout(() => {

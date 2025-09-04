@@ -25,13 +25,13 @@ export default function initHeroScroll() {
 
   // Configuration
   const CFG = {
-    baseURL: '/assets/framesHero/',
+    baseURL: 'https://spectacular-heliotrope-95f142.netlify.app/assets/framesHero/',
     prefix: 'heroFrame-',
     ext: 'avif',
     pad: 3,
     startIndex: 1,
     lastIndex: 382,
-    scrollLen: 4000
+    scrollLen: 8000
   };
 
   // State
@@ -161,88 +161,111 @@ export default function initHeroScroll() {
     return a + (b - a) * t;
   }
 
-  // Setup text lines animation
-  function setupTextLines(timeline) {
-    const lines = document.querySelectorAll('[data-hero-line]:not([data-mode="intro"])');
-    let lineCount = 0;
+  // Reference-style scrubbed text renderer (pure function of progress)
+  // Mirrors the provided example: split once; compute per-char styles each tick from a shared driver progress.
+  function createReferenceTextRender() {
+    // Select the 5 hero lines exactly like the reference wants
+    // Structure: .hero-content > p > .heading-1 > .hero-line
+    const lines = Array.from(document.querySelectorAll('p.hero-line'));
+    if (lines.length === 0) return { destroy: () => {} };
 
-    lines.forEach((lineEl, index) => {
-      const inFrame = parseInt(lineEl.dataset.in);
-      const outFrame = lineEl.dataset.out ? parseInt(lineEl.dataset.out) : null;
-      const stay = lineEl.dataset.stay === '1';
-
-      if (!Number.isFinite(inFrame)) return;
-
-      // Calculate timeline positions
-      const startP = (inFrame - CFG.startIndex) / (CFG.lastIndex - CFG.startIndex);
-      const endP = outFrame ? (outFrame - CFG.startIndex) / (CFG.lastIndex - CFG.startIndex) : null;
-
-      // Split text if not already split
+    // Pre-split and cache chars
+    const lineChars = lines.map((lineEl) => {
       let chars = lineEl.querySelectorAll('span');
       if (chars.length === 0) {
-        const split = new SplitText(lineEl, { 
-          type: "chars",
-          position: "absolute",
-          preserveWhitespace: true
+        const split = new SplitText(lineEl, {
+          type: 'words,chars',
+          position: 'absolute',
+          preserveWhitespace: true,
+          wordDelimiter: ' '
         });
         chars = split.chars;
       }
-
-      // Set initial states
-      gsap.set(lineEl, { autoAlpha: 0 });
-      gsap.set(chars, {
-        opacity: 0,
-        color: "#e68d29"
+      // Initial styles: hidden and base color (orange) using direct style writes
+      lineEl.style.display = 'none';
+      lineEl.style.opacity = '0';
+      lineEl.style.visibility = 'hidden';
+      Array.from(chars).forEach((c) => {
+        c.style.opacity = '0';
+        c.style.color = '#e68d29';
       });
-
-      // Animation durations
-      const opacityDur = 0.18;
-      const colorDur = 0.38;
-
-      // Apparition à startP
-      timeline.to(chars, {
-        opacity: 1,
-        color: "#e68d29",
-        duration: opacityDur,
-        stagger: {
-          from: "start",
-          amount: 0.60,
-          onComplete: function () {
-            gsap.to(this.targets()[0], {
-              color: "#FFF",
-              duration: colorDur,
-              ease: "expo.inOut"
-            });
-          }
-        },
-        ease: "power4.inOut",
-        immediateRender: false
-      }, startP);
-
-      // Disparition à endP (si out défini et pas "stay")
-      if (!stay && Number.isFinite(outFrame)) {
-        const disappearDur = 0.20;
-        timeline.to(lineEl, {
-          autoAlpha: 0,
-          duration: disappearDur,
-          ease: "power1.in",
-          immediateRender: false
-        }, endP);
-      }
-
-      // Dispatch enter event
-      timeline.call(() => {
-        window.dispatchEvent(new CustomEvent("heroLine:enter", { 
-          detail: { index, el: lineEl } 
-        }));
-        console.log('[LE] heroLine enter', index, lineEl.textContent?.substring(0, 20) + '...');
-      }, [], startP);
-
-      lineCount++;
+      return Array.from(chars);
     });
 
-    return lineCount;
+    // Easing helpers (approx pow2)
+    const easeOut = (t) => 1 - Math.pow(1 - t, 2);
+    const easeIn = (t) => t * t;
+    const clamp01 = (t) => Math.max(0, Math.min(1, t));
+
+    // Tunables
+    const REVEAL_PORTION = 0.5; // D
+    const HOLD_OVERLAP = 0.12;  // l (keep line fully visible for a bit)
+
+    function renderFromProgress(pRaw) {
+      const p = clamp01(pRaw);
+      // Fade out intro heading as scroll starts
+      // Intro element (separate from lines)
+      const firstHeading = document.querySelector('.hero-content .heading-1');
+      if (firstHeading) {
+        const fade = clamp01(p / 0.03);
+        const o = 1 - fade;
+        firstHeading.style.opacity = String(o);
+        firstHeading.style.visibility = o <= 0.02 ? 'hidden' : 'visible';
+      }
+
+      const K = lines.length;
+      const segment = p * K;
+      const idx = Math.max(0, Math.min(K - 1, Math.floor(segment)));
+      const t = segment - idx;
+      console.log('[LE:heroText] p=', p.toFixed(3), 'K=', K, 'idx=', idx, 't=', t.toFixed(3));
+
+      // Hide all non-active lines
+      for (let i = 0; i < K; i++) {
+        if (i !== idx) {
+          const el = lines[i];
+          el.style.display = 'none';
+          el.style.opacity = '0';
+          el.style.visibility = 'hidden';
+        }
+      }
+
+      const activeLine = lines[idx];
+      const chars = lineChars[idx];
+      activeLine.style.display = 'block';
+      activeLine.style.opacity = '1';
+      activeLine.style.visibility = 'visible';
+
+      const D = REVEAL_PORTION;
+      const I = Math.min(1, D + HOLD_OVERLAP);
+      const isLast = idx === K - 1;
+      const lastStay = isLast && activeLine.dataset.stay === '1';
+
+      const revealT = clamp01(t / D);
+      const fadeT = lastStay ? 0 : clamp01((t - I) / (1 - I));
+      const V = chars.length || 1;
+
+      for (let c = 0; c < V; c++) {
+        const char = chars[c];
+        const m = c / V;
+        const r1 = clamp01((revealT - m) / (1 / V));
+        const r2 = clamp01((fadeT - m) / (1 / V));
+        const reveal = easeOut(r1);
+        const fade = easeIn(r2);
+        const opacity = clamp01(reveal * (1 - fade));
+        const isFading = fade > 0.01;
+        const color = isFading ? '#e68d29' : (reveal > 0.99 ? '#FFF' : '#e68d29');
+        char.style.opacity = String(opacity);
+        char.style.color = color;
+      }
+    }
+
+    return { 
+      render: renderFromProgress,
+      lines: lines // Expose lines array for external access
+    };
   }
+
+  // Legacy timeline-based text was removed in favor of the reference scrubbed renderer.
 
   // Check for reduced motion
   function prefersReducedMotion() {
@@ -257,6 +280,22 @@ export default function initHeroScroll() {
   function init() {
     if (!ensureCanvas()) return null;
 
+    // Immediately hide hero lines to prevent flash on load (will be driven by scrubber)
+    const initialLines = document.querySelectorAll('p.hero-line');
+    initialLines.forEach(lineEl => {
+      lineEl.style.opacity = '0';
+      lineEl.style.visibility = 'hidden';
+      lineEl.style.display = 'none';
+    });
+
+    // Ensure hero-content sits above the canvas (without breaking existing CSS)
+    const heroContent = document.querySelector('.hero-content');
+    if (heroContent) {
+      const style = heroContent.style;
+      if (!style.position) style.position = 'relative';
+      if (!style.zIndex) style.zIndex = '2';
+    }
+
     // Handle reduced motion
     if (prefersReducedMotion()) {
       console.info('[LE:heroScroll] reduced motion - showing static frame');
@@ -265,13 +304,13 @@ export default function initHeroScroll() {
       });
       
       // Show all text lines without animation
-      const lines = document.querySelectorAll('[data-hero-line]:not([data-mode="intro"])');
+      const lines = document.querySelectorAll('p.hero-line');
       lines.forEach(lineEl => {
-        gsap.set(lineEl, { autoAlpha: 1 });
+        lineEl.style.display = 'block';
+        lineEl.style.opacity = '1';
+        lineEl.style.visibility = 'visible';
         const chars = lineEl.querySelectorAll('span');
-        if (chars.length > 0) {
-          gsap.set(chars, { opacity: 1, color: "#FFF" });
-        }
+        chars.forEach((c) => { c.style.opacity = '1'; c.style.color = '#FFF'; });
       });
       
       return { reducedMotion: true };
@@ -285,8 +324,10 @@ export default function initHeroScroll() {
       preloadRemainingFrames();
 
       // Create master timeline with ScrollTrigger
+      let scrubber = null; // will be assigned after timeline creation
       const timeline = gsap.timeline({
         scrollTrigger: {
+          id: 'heroScroll',
           trigger: '.hero',
           start: 'top top',
           end: `+=${CFG.scrollLen}`,
@@ -294,18 +335,54 @@ export default function initHeroScroll() {
           pin: true,
           anticipatePin: 1,
           invalidateOnRefresh: true,
+          refreshPriority: 100,
+          preventOverlaps: true,
           onUpdate: (self) => {
             const newFrame = Math.round(lerp(CFG.startIndex, CFG.lastIndex, self.progress));
             if (newFrame !== currentFrame) {
               currentFrame = newFrame;
               drawFrame(currentFrame);
             }
+            // Drive text renderer from the SAME driver as frames (reference sync)
+            try { 
+              if (scrubber) {
+                scrubber.render(self.progress);
+                
+                // Check for last line completion to trigger CTA
+                if (!lastLineCompleteDispatched && self.progress > 0) {
+                  const K = scrubber.lines.length;
+                  const idx = Math.floor(self.progress * K);
+                  const t = self.progress * K - idx;
+                  
+                  // If we're on the last line and it's in the hold phase (fully visible)
+                  if (idx === K - 1 && t >= 0.5 && t < 0.62) {
+                    lastLineCompleteDispatched = true;
+                    window.dispatchEvent(new CustomEvent('le:hero:last-line-complete'));
+                    console.log('[LE:heroScroll] Last line complete - CTA can animate');
+                  }
+                }
+              }
+            } catch (e) { console.warn('[LE:heroText] render error', e); }
+          },
+          onStart: () => {
+            // First heading will be animated out by setupFirstHeading()
           }
         }
       });
 
-      // Setup text lines
-      const lineCount = setupTextLines(timeline);
+      // Setup scrubbed text rendering (no timelines)
+      // Fresh, reference-style scrubber render function
+      scrubber = createReferenceTextRender();
+      
+      // Track last line completion for CTA sync
+      let lastLineCompleteDispatched = false;
+
+      // EXACT reference approach: standalone ScrollTrigger driving text via its own progress
+      // Initial render state
+      try { scrubber.render(0); } catch (_) {}
+
+      // We still compute line count for logging
+      const lineCount = document.querySelectorAll('p.hero-line').length;
 
       // Refresh ScrollTrigger
       ScrollTrigger.refresh();
