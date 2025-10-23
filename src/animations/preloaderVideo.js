@@ -45,10 +45,10 @@ import { computeShouldSkipIntro, setGlobalSkipFlag, markFirstVisitDone } from '.
 
     // Sources (order: webm then mp4 fallback)
     const s1 = document.createElement('source');
-    s1.src = '/assets/videos/intro.webm';
+    s1.src = 'https://spectacular-heliotrope-95f142.netlify.app/assets/videos/intro.webm';
     s1.type = 'video/webm';
     const s2 = document.createElement('source');
-    s2.src = '/assets/videos/intro.mp4';
+    s2.src = 'https://spectacular-heliotrope-95f142.netlify.app/assets/videos/intro.mp4';
     s2.type = 'video/mp4';
     video.appendChild(s1);
     video.appendChild(s2);
