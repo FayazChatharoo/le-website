@@ -27,8 +27,3 @@ import initHeroScroll from "./scroll/heroScroll.js";
     initHeroScroll?.();
   });
 })();
-
-
-
-console.info("[LE] bundle chargé live server finder localhost thing");
-
