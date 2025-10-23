@@ -25,7 +25,7 @@ export default function initHeroScroll() {
 
   // Configuration
   const CFG = {
-    baseURL: '/assets/framesHero/',
+    baseURL: 'https://spectacular-heliotrope-95f142.netlify.app/assets/framesHero/',
     prefix: 'heroFrame-',
     ext: 'avif',
     pad: 3,
